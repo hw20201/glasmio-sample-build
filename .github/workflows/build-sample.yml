@@ -1,0 +1,48 @@
+name: Build Glasmio sample
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out upstream Glasmio
+        uses: actions/checkout@v4
+        with:
+          repository: NEORUAA/Glasmio
+          ref: 1fb05a72334364fe43b472f5a78208b80e23cd62
+          path: glasmio
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-37" "build-tools;36.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+
+      - name: Build sample (debug)
+        working-directory: glasmio
+        run: ./gradlew :sample:assembleDebug --stacktrace
+
+      - name: Verify APK
+        run: |
+          APK=glasmio/sample/build/outputs/apk/debug/sample-debug.apk
+          ls -l "$APK"
+          sha256sum "$APK"
+          AAPT2=$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | head -1)
+          "$AAPT2" dump badging "$APK" | head -3
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Glasmio-sample-debug-apk
+          path: glasmio/sample/build/outputs/apk/debug/sample-debug.apk
+          if-no-files-found: error
